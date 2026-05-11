@@ -405,7 +405,9 @@ $itemsBlock
                             append("   ${item.note}\n")
                         }
 
-                        append("\n")
+//                        if (item != items.last()) {
+//                            append("\n")
+//                        }
                     }
                 }
             }
@@ -417,7 +419,7 @@ $itemsBlock
             append(ALIGN_LEFT)
             append(header)
             append(itemsBlock)
-            append("------------------------\n\n")
+            append("------------------------\n")
         }
     }
 

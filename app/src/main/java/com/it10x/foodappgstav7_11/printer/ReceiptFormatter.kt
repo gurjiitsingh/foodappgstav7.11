@@ -189,24 +189,7 @@ Thank You!
                     append(qty + name + price + total + "\n")
 
 
-                    val totalsBlock = buildString {
-
-                        appendLine(totalLine48("Item Total", order.itemTotal))
-
-                        if ((order.deliveryFee ?: 0.0) > 0.0) {
-                            appendLine(totalLine48("Delivery", order.deliveryFee))
-                        }
-
-                        if ((order.discount ?: 0.0) > 0.0) {
-                            appendLine(totalLine48("Discount", order.discount))
-                        }
-
-                        if ((order.tax ?: 0.0) > 0.0) {
-                            appendLine(totalLine48("Tax", order.tax))
-                        }
-                    }
-
-                    // 🔹 Modifiers (if any)
+                   // 🔹 Modifiers (if any)
                     if (!item.modifiersJson.isNullOrBlank()) {
                         try {
                             val modifiers = item.modifiersJson

@@ -289,7 +289,6 @@ object BluetoothPrinter {
                     //output.write(byteArrayOf(0x0A))
                 }
 
-
                 // =============================
                 // LEFT ALIGN TEXT
                 // =============================

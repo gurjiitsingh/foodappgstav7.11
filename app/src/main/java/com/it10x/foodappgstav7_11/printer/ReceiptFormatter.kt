@@ -37,6 +37,23 @@ object ReceiptFormatter {
 
         val headerBlock = buildHeaderBlock(order)
 
+        val totalsBlock = buildString {
+
+            append(totalLine("Item Total", order.itemTotal))
+
+            if ((order.deliveryFee ?: 0.0) > 0.0) {
+                append(totalLine("Delivery", order.deliveryFee))
+            }
+
+            if ((order.discount ?: 0.0) > 0.0) {
+                append(totalLine("Discount", order.discount))
+            }
+
+            if ((order.tax ?: 0.0) > 0.0) {
+                append(totalLine("Tax", order.tax))
+            }
+        }
+
         val itemsBlock = if (order.items.isEmpty()) {
             "No items found"
         } else {
@@ -67,6 +84,7 @@ object ReceiptFormatter {
 
                     // 🔹 Main item line (32 chars total)
                     append(qty + name + price + total + "\n")
+
 
                     // 🔹 Modifiers (indented, max width safe)
                     if (!item.modifiersJson.isNullOrBlank()) {
@@ -101,7 +119,6 @@ object ReceiptFormatter {
             append(ALIGN_LEFT)
             append(
                 """
-
 ------------------------------
 $outletHeader
 ------------------------------
@@ -109,10 +126,7 @@ $headerBlock
 ----------------------------
 $itemsBlock
 ------------------------------
-${totalLine("Item Total", order.itemTotal)}
-${totalLine("Delivery", order.deliveryFee)}
-${totalLine("Discount", order.discount)}
-${totalLine("Tax", order.tax)}
+$totalsBlock
 ------------------------------
 ${totalLine("GRAND TOTAL", order.grandTotal)}
 ------------------------------
@@ -130,10 +144,24 @@ Thank You!
         //  Log.d("RECEIPT_FORMATTER", "billing48() called for orderNo=${order.orderNo}")
         val outletHeader = buildOutletHeader(outletInfo, LINE_WIDTH)
 
-
-
-
         val headerBlock = buildHeaderBlock(order)
+
+        val totalsBlock = buildString {
+
+            append(totalLine48("Item Total", order.itemTotal))
+
+            if ((order.deliveryFee ?: 0.0) > 0.0) {
+                append(totalLine48("Delivery", order.deliveryFee))
+            }
+
+            if ((order.discount ?: 0.0) > 0.0) {
+                append(totalLine48("Discount", order.discount))
+            }
+
+            if ((order.tax ?: 0.0) > 0.0) {
+                append(totalLine48("Tax", order.tax))
+            }
+        }
 
         val itemsBlock = if (order.items.isEmpty()) {
             "No items found"
@@ -159,6 +187,24 @@ Thank You!
 
                     // 🔹 Main line
                     append(qty + name + price + total + "\n")
+
+
+                    val totalsBlock = buildString {
+
+                        appendLine(totalLine48("Item Total", order.itemTotal))
+
+                        if ((order.deliveryFee ?: 0.0) > 0.0) {
+                            appendLine(totalLine48("Delivery", order.deliveryFee))
+                        }
+
+                        if ((order.discount ?: 0.0) > 0.0) {
+                            appendLine(totalLine48("Discount", order.discount))
+                        }
+
+                        if ((order.tax ?: 0.0) > 0.0) {
+                            appendLine(totalLine48("Tax", order.tax))
+                        }
+                    }
 
                     // 🔹 Modifiers (if any)
                     if (!item.modifiersJson.isNullOrBlank()) {
@@ -200,10 +246,7 @@ $headerBlock
 ------------------------------------------------
 $itemsBlock
 ------------------------------------------------
-${totalLine48("Item Total", order.itemTotal)}
-${totalLine48("Delivery", order.deliveryFee)}
-${totalLine48("Discount", order.discount)}
-${totalLine48("Tax", order.tax)}
+$totalsBlock
 ------------------------------------------------
 ${totalLine48("GRAND TOTAL", order.grandTotal)}
 ------------------------------------------------
@@ -397,145 +440,6 @@ $itemsBlock
 
 
 
-    fun posKitchenFontVar(
-        sessionKey: String,
-        orderType: String,
-        items: List<PosKotItemEntity>,
-        title: String = "KITCHEN"
-    ): String {
-
-        val TEXT_NORMAL = "\u001D!\u0000"
-        val TEXT_DOUBLE_HEIGHT = "\u001B!\u0010"
-        val TEXT_DOUBLE_WIDTH = "\u001B!\u0001"
-        val TEXT_BIG = "\u001D!\u0011"
-
-        val time = java.text.SimpleDateFormat(
-            "HH:mm",
-            java.util.Locale.getDefault()
-        ).format(java.util.Date())
-
-        val header = buildString {
-            append(TEXT_BIG)
-            append("******** $title ********\n")
-            append(TEXT_NORMAL)
-            append("Type  : $orderType\n")
-            append("Ref   : $sessionKey\n")
-            append("Time  : $time\n")
-            append("------------------------\n")
-        }
-
-
-
-        val itemsBlock =
-            if (items.isEmpty()) {
-                "No items\n"
-            } else {
-                buildString {
-                    items.forEach { item ->
-
-                        // 🔹 Main item line
-                        append("${item.quantity.toString().padEnd(3)} ${item.name}\n")
-
-                        // 🔹 Modifiers (if any)
-                        if (item.modifiersJson.isNotEmpty()) {
-                            try {
-                                val modifiers = item.modifiersJson
-                                    .removePrefix("[")
-                                    .removeSuffix("]")
-                                    .split(",")
-                                    .map { it.trim().replace("\"", "") }
-                                    .filter { it.isNotBlank() }
-
-                                modifiers.forEach { modifier ->
-                                    append("      + $modifier\n")
-                                }
-                            } catch (_: Exception) {
-                                append("      + ${item.modifiersJson}\n")
-                            }
-                        }
-
-                        // 🔹 Note (if any)
-                        if (item.note.isNotEmpty()) {
-                            append("     ${item.note}\n")
-                        }
-
-                        append("\n")
-                    }
-                }
-            }
-
-
-
-
-        return buildString {
-            append(ALIGN_LEFT)
-            append(header)
-            append(itemsBlock)
-            append("------------------------\n\n")
-        }
-    }
-
-
-    // -----------------------------
-// INTERNAL HELPERS (dynamic lineWidth)
-// -----------------------------
-    private fun billingWithWidth(order: PrintOrder, title: String, lineWidth: Int): String {
-
-        val headerBlock = buildHeaderBlock(order)
-
-        val itemsBlock = if (order.items.isEmpty()) {
-            "No items found"
-        } else {
-            val header =
-                "QTY".padEnd(5) +               // slightly more space for qty
-                        "ITEM".padEnd(lineWidth - 20) + // dynamic item width
-                        "PRICE".padStart(7) +
-                        "TOTAL".padStart(7)
-
-            val divider = "-".repeat(lineWidth)
-
-            val lines = order.items.joinToString("\n") { item ->
-                val qty = item.quantity.toString().padEnd(5)
-                val name = item.name.take(lineWidth - 20).padEnd(lineWidth - 20)
-                val price = format(item.price).padStart(7)
-                val total = format(item.subtotal).padStart(7)
-                qty + name + price + total
-            }
-
-            "$header\n$divider\n$lines"
-        }
-
-        return buildString {
-            append(ALIGN_LEFT)
-            append(
-                """
-${"-".repeat(lineWidth)}
-$title
-${"-".repeat(lineWidth)}
-$headerBlock
-${"-".repeat(lineWidth)}
-$itemsBlock
-${"-".repeat(lineWidth)}
-${totalLineWidth("Item Total", order.itemTotal, lineWidth)}
-${totalLineWidth("Delivery", order.deliveryFee, lineWidth)}
-${totalLineWidth("Discount", order.discount, lineWidth)}
-${totalLineWidth("Tax", order.tax, lineWidth)}
-${"-".repeat(lineWidth)}
-${totalLineWidth("GRAND TOTAL", order.grandTotal, lineWidth)}
-${"-".repeat(lineWidth)}
-Thank You!
-""".trimIndent()
-            )
-        }
-    }
-
-    // totalLine helper for dynamic width
-    private fun totalLineWidth(label: String, value: Double, lineWidth: Int): String {
-        if (value == 0.0) return ""
-        val left = label.padEnd(lineWidth - 12)
-        val right = format(value).padStart(12)
-        return left + right
-    }
 
 
     private fun totalLine48(label: String, amount: Double): String {
@@ -555,21 +459,45 @@ Thank You!
                 lines += address.take(width)
             }
         if(width==32){
-            info.addressLine2?.let { lines += it.take(width) }
-            info.addressLine3?.let { lines += it.take(width) }
-            info.city?.let { lines += it.take(width) }
-            info.phone?.let { lines += "Phone: $it" }
-            info.phone2?.let { lines += " $it" }
-            info.email?.let { lines += "Email: $it" }
-            info.web?.let { lines += "Web: $it" }
+            info.addressLine2
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += it.take(width) }
+            info.addressLine3
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += it.take(width) }
+           info.city
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += it.take(width) }
+            val phone1 = info.phone?.takeIf { it.isNotBlank() }
+            val phone2 = info.phone2?.takeIf { it.isNotBlank() }
+
+            if (phone1 != null && phone2 != null) {
+                lines += "Phone: $phone1, $phone2".take(width)
+            } else if (phone1 != null) {
+                lines += "Phone: $phone1".take(width)
+            } else if (phone2 != null) {
+                lines += "Phone: $phone2".take(width)
+            }
+            info.email
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += "Email: $it" }
+            info.web
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += "$it" }
             info.gst?.let { lines += "GST: $it" }
-            //   info.footerNote?.let { lines += it.take(width) }
+            //info.footerNote?.let { lines += it.take(width) }
         }
 
         if(width==48){
-            info.addressLine2?.let { lines += it.take(width) }
-            info.addressLine3?.let { lines += it.take(width) }
-            info.city?.let { lines += it.take(width) }
+            info.addressLine2
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += it.take(width) }
+            info.addressLine3
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += it.take(width) }
+            info.city
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += it.take(width) }
             val phone1 = info.phone?.takeIf { it.isNotBlank() }
             val phone2 = info.phone2?.takeIf { it.isNotBlank() }
 
@@ -583,8 +511,12 @@ Thank You!
                 // Only second phone
                 lines += "Phone: $phone2".take(width)
             }
-            info.email?.let { lines += "Email: $it" }
-            info.web?.let { lines += "Web: $it" }
+            info.email
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += "Email: $it" }
+            info.web
+                ?.takeIf { it.isNotBlank() }
+                ?.let { lines += "$it" }
             info.gst?.let { lines += "GST: $it" }
             // info.footerNote?.let { lines += it.take(width) }
         }
@@ -602,17 +534,15 @@ Thank You!
 
         val note = info.footerNote?.trim()
 
-        // 🔹 If null or blank → return empty (do not show anything)
+        // 🔹 If null or blank → return empty
         if (note.isNullOrBlank()) return ""
 
         val wrappedLines = wrapText(note, width)
 
         return buildString {
-            append("-".repeat(width))
-            append("\n")
 
             wrappedLines.forEach { line ->
-                append(line)     // left aligned (better for readability)
+                append(line)
                 append("\n")
             }
 
@@ -620,7 +550,6 @@ Thank You!
             append("\n")
         }
     }
-
     private fun wrapText(text: String, width: Int): List<String> {
         val words = text.split("\\s+".toRegex())
         val lines = mutableListOf<String>()

@@ -173,7 +173,144 @@ object LanPrinter {
         }.start()
     }
 
+    fun printLogoTextQr(
+        ip: String,
+        port: Int,
+        logoBitmap: android.graphics.Bitmap?,
+        qrBitmap: android.graphics.Bitmap?,
+        text: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
 
+            var socket: Socket? = null
+            var output: OutputStream? = null
+
+            try {
+                socket = Socket()
+                socket.connect(InetSocketAddress(ip, port), TIMEOUT)
+
+                output = socket.getOutputStream()
+
+                // INIT
+                output.write(byteArrayOf(0x1B, 0x40))
+
+                // 🔔 BEEP
+                output.write(byteArrayOf(0x1B, 0x42, 0x03, 0x02))
+
+                // CENTER ALIGN
+                output.write(byteArrayOf(0x1B, 0x61, 0x01))
+
+                // =============================
+                // LOGO
+                // =============================
+                if (logoBitmap != null) {
+                    val logoBytes = convertBitmapToRaster(logoBitmap)
+                    output.write(logoBytes)
+                }
+
+                // =============================
+                // QR
+                // =============================
+                if (qrBitmap != null) {
+
+                    output.write(byteArrayOf(0x0A))
+
+                    output.flush()
+
+                    val qrBytes = convertBitmapToRaster(qrBitmap)
+                    output.write(qrBytes)
+                }
+
+                // =============================
+                // TEXT
+                // =============================
+                output.write(byteArrayOf(0x1B, 0x61, 0x00))
+
+                val safeText = text
+                    .replace("\n", "\r\n")
+                    .toByteArray(Charsets.UTF_8)
+
+                output.write(safeText)
+
+                output.write(byteArrayOf(0x0A, 0x0A))
+
+                // =============================
+                // CUT
+                // =============================
+                output.write(byteArrayOf(
+                    0x0A, 0x0A,
+                    0x1D, 0x56, 0x01
+                ))
+
+                output.flush()
+
+                withContext(Dispatchers.Main) {
+                    onResult(true)
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "LAN logo + QR failed", e)
+                withContext(Dispatchers.Main) {
+                    onResult(false)
+                }
+            } finally {
+                try {
+                    output?.close()
+                    socket?.close()
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun convertBitmapToRaster(bitmap: android.graphics.Bitmap): ByteArray {
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val bytes = ArrayList<Byte>()
+        val bytesPerLine = (width + 7) / 8
+
+        // GS v 0
+        bytes.add(0x1D)
+        bytes.add(0x76)
+        bytes.add(0x30)
+        bytes.add(0x00)
+
+        bytes.add((bytesPerLine % 256).toByte())
+        bytes.add((bytesPerLine / 256).toByte())
+
+        bytes.add((height % 256).toByte())
+        bytes.add((height / 256).toByte())
+
+        for (y in 0 until height) {
+            for (x in 0 until bytesPerLine * 8 step 8) {
+
+                var byte = 0
+
+                for (bit in 0 until 8) {
+                    val xPos = x + bit
+
+                    if (xPos < width) {
+                        val pixel = bitmap.getPixel(xPos, y)
+
+                        val r = (pixel shr 16) and 0xff
+                        val g = (pixel shr 8) and 0xff
+                        val b = pixel and 0xff
+
+                        val gray = (r + g + b) / 3
+
+                        if (gray < 128) {
+                            byte = byte or (1 shl (7 - bit))
+                        }
+                    }
+                }
+
+                bytes.add(byte.toByte())
+            }
+        }
+
+        return bytes.toByteArray()
+    }
     private fun convertBitmapToEscPos(bitmap: android.graphics.Bitmap): ByteArray {
         val width = bitmap.width
         val height = bitmap.height

@@ -437,7 +437,7 @@ $itemsBlock
 
     private fun buildOutletHeader(info: OutletInfo, width: Int): String {
         val lines = mutableListOf<String>()
-        if (info.name.isNotBlank()) lines += centerText(info.name, width)
+        if (info.outletName.isNotBlank()) lines += centerText(info.outletName, width)
         info.addressLine1
             ?.takeIf { it.isNotBlank() }
             ?.let { address ->
@@ -469,7 +469,7 @@ $itemsBlock
             info.web
                 ?.takeIf { it.isNotBlank() }
                 ?.let { lines += "$it" }
-            info.gst?.let { lines += "GST: $it" }
+            info.gstVatNumber?.let { lines += "GST: $it" }
             //info.footerNote?.let { lines += it.take(width) }
         }
 
@@ -502,7 +502,7 @@ $itemsBlock
             info.web
                 ?.takeIf { it.isNotBlank() }
                 ?.let { lines += "$it" }
-            info.gst?.let { lines += "GST: $it" }
+            info.gstVatNumber?.let { lines += "GST: $it" }
             // info.footerNote?.let { lines += it.take(width) }
         }
 
@@ -757,7 +757,7 @@ $itemsBlock
 
             append("\u001B\u0061\u0001") // center
 
-            append(info.name + "\n")
+            append(info.outletName + "\n")
             append(divider + "\n")
 
             append("CATEGORY SUMMARY\n")
@@ -805,7 +805,7 @@ $itemsBlock
             append("\u001B\u0061\u0000")
 
             // ✅ Outlet name
-            append(centerText(info.name, width) + "\n")
+            append(centerText(info.outletName, width) + "\n")
             append(divider + "\n")
 
             append("PRODUCT REPORT\n")
@@ -856,7 +856,7 @@ $itemsBlock
             append("\u001B\u0061\u0001") // center align
 
             // ✅ OUTLET NAME
-            append(outletInfo.name + "\n")
+            append(outletInfo.outletName + "\n")
 
             append(divider + "\n")
 
@@ -915,7 +915,7 @@ $itemsBlock
 
         return buildString {
 
-            appendLine(center(info.name, width))
+            appendLine(center(info.outletName, width))
             appendLine("-".repeat(width))
 
             appendLine(center("TOTAL SALES REPORT", width))
@@ -977,7 +977,7 @@ $itemsBlock
 
         return buildString {
 
-            append(centerText(info.name, width) + "\n")
+            append(centerText(info.outletName, width) + "\n")
             append(divider + "\n")
 
             append(centerText("TOTAL SALES REPORT", width) + "\n")
@@ -1011,7 +1011,7 @@ $itemsBlock
 
         return buildString {
 
-            appendLine(centerText(info.name, width))
+            appendLine(centerText(info.outletName, width))
             appendLine("-".repeat(width))
 
             appendLine(centerText("SALES REPORT", width))
@@ -1097,7 +1097,7 @@ $itemsBlock
 
         return buildString {
 
-            appendLine(centerText(info.name, width))
+            appendLine(centerText(info.outletName, width))
             appendLine("-".repeat(width))
 
             appendLine(centerText("CATEGORY SALES REPORT", width))

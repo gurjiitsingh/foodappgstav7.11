@@ -206,10 +206,10 @@ fun OutletInfoContainer() {
                 Text("Outlet not synced ❌")
             } else {
 
-                Text("Name: ${outlet!!.name}")
+                Text("Name: ${outlet!!.outletName}")
                 Text("Address: ${outlet!!.addressLine1 ?: ""}")
                 Text("City: ${outlet!!.city ?: ""}")
-                Text("GST: ${outlet!!.gst ?: "-"}")
+                Text("GST: ${outlet!!.gstVatNumber ?: "-"}")
                 Text("Phone: ${outlet!!.phone ?: "-"}")
                 Text("Currency: ${outlet!!.defaultCurrency}")
             }

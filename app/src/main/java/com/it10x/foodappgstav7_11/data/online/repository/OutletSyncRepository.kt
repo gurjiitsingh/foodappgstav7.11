@@ -8,7 +8,7 @@ import com.it10x.foodappgstav7_11.data.pos.entities.config.OutletEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-
+import com.it10x.foodappgstav7_11.printer.utils.QrUtils
 class OutletSyncRepository(
     private val db: AppDatabase,
     private val context: android.content.Context
@@ -70,6 +70,11 @@ class OutletSyncRepository(
             printerName = data["printerName"] as? String,
             footerNote = data["footerNote"] as? String,
 
+            // ---------- QR ----------
+            qrEnabled = data["qrEnabled"] as? Boolean ?: false,
+            qrText = data["qrText"] as? String,
+            qrTitle = data["qrTitle"] as? String,
+
             // ---------- STATUS ----------
             isActive = data["isActive"] as? Boolean ?: true,
             // ---------- NEW: DEFAULT CURRENCY ----------
@@ -89,7 +94,7 @@ Phone1     = ${outlet.phone}
 Phone2     = ${outlet.phone2 ?: "-"}
 Email      = ${outlet.email ?: "-"}
 Web        = ${outlet.web ?: "-"}
-Logo       = ${'$'}{outlet.logoUrl ?: "No Logo"}
+Logo       = ${outlet.logoUrl ?: "No Logo"}
 GST/VAT    = ${outlet.gstVatNumber ?: "N/A"}
 Printer    = ${outlet.printerWidth}mm
 """.trimIndent()
@@ -128,7 +133,72 @@ Printer    = ${outlet.printerWidth}mm
             }
         }
 
-     //   Log.d("SYNC_OUTLET", "Outlet saved into Room")
+
+        // --------------------------------------------
+// ✅ GENERATE & SAVE QR PNG
+// --------------------------------------------
+        if (
+            outlet.qrEnabled &&
+            !outlet.qrText.isNullOrBlank()
+        ) {
+
+            try {
+
+                Log.d("QR_DEBUG", "Generating QR")
+
+                val qrBitmap = QrUtils.generateQr(
+                    outlet.qrText,
+                    256
+                )
+
+                val qrFile = java.io.File(
+                    context.filesDir,
+                    "qr.png"
+                )
+
+                java.io.FileOutputStream(qrFile).use { out ->
+
+                    qrBitmap.compress(
+                        android.graphics.Bitmap.CompressFormat.PNG,
+                        100,
+                        out
+                    )
+                }
+
+                Log.d(
+                    "QR_DEBUG",
+                    "QR saved at: ${qrFile.absolutePath}"
+                )
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    "QR_DEBUG",
+                    "QR generation failed",
+                    e
+                )
+            }
+
+        } else {
+
+            // ✅ DELETE OLD QR IF QR DISABLED
+
+            val qrFile = java.io.File(
+                context.filesDir,
+                "qr.png"
+            )
+
+            if (qrFile.exists()) {
+
+                qrFile.delete()
+
+                Log.d(
+                    "QR_DEBUG",
+                    "Old QR deleted"
+                )
+            }
+        }
+
     }
 
     private fun downloadBitmapFromUrl(url: String): Bitmap? {

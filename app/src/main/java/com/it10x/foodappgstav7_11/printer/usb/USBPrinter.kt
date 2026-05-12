@@ -105,7 +105,7 @@ object USBPrinter {
     // =================================================
     // CORE PRINT (ORDER / AUTO)
     // =================================================
-    fun printText(
+    fun printText1(
         context: Context,
         device: UsbDevice,
         text: String,
@@ -130,7 +130,7 @@ object USBPrinter {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val init = byteArrayOf(0x1B, 0x40)
-                    val beep = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
+                   val beep = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
 
                     val feedAndCut = byteArrayOf(
                         0x1B, 0x64, 0x03,
@@ -159,19 +159,15 @@ object USBPrinter {
     }
 
 
-    fun printLogoAndText(
+    fun printQrUSB(
         context: Context,
         device: UsbDevice,
-        bitmap: Bitmap,
-        text: String,
+        qrBitmap: Bitmap,
         onResult: (Boolean) -> Unit
     ) {
-
-        // ✅ ALWAYS INIT FIRST
         init(context, device) { ready ->
 
             if (!ready) {
-                Log.e(TAG, "USB init failed")
                 onResult(false)
                 return@init
             }
@@ -180,7 +176,6 @@ object USBPrinter {
             val conn = connection
 
             if (ep == null || conn == null) {
-                Log.e(TAG, "USB printer not ready AFTER INIT")
                 onResult(false)
                 return@init
             }
@@ -188,48 +183,219 @@ object USBPrinter {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     // INIT
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x40), 2, 1000)
+                    Thread.sleep(50)
+
+                    // CENTER
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x61, 0x01), 3, 1000)
+                    Thread.sleep(50)
+
+                    // PRINT QR LIKE BLUETOOTH
+                    val resizedQr = Bitmap.createScaledBitmap(
+                        qrBitmap,
+                        256,
+                        256,
+                        true
+                    )
+
+                    printBitmapInChunksUSB(conn, ep, resizedQr)
+
+                    Thread.sleep(100)
+
+                    // FEED
+                    conn.bulkTransfer(ep, byteArrayOf(0x0A), 1, 1000)
+
+                    withContext(Dispatchers.Main) {
+                        onResult(true)
+                    }
+
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        onResult(false)
+                    }
+                }
+            }
+        }
+    }
+    private fun convertBitmapToRaster(bitmap: Bitmap): ByteArray {
+        val width = bitmap.width
+        val originalHeight = bitmap.height
+
+        val height = originalHeight
+
+        val bytes = ArrayList<Byte>()
+        val bytesPerLine = (width + 7) / 8
+
+        // GS v 0
+        bytes.add(0x1D)
+        bytes.add(0x76)
+        bytes.add(0x30)
+        bytes.add(0x00)
+
+        bytes.add((bytesPerLine % 256).toByte())
+        bytes.add((bytesPerLine / 256).toByte())
+
+        bytes.add((height % 256).toByte())
+        bytes.add((height / 256).toByte())
+
+        for (y in 0 until height) {
+            for (x in 0 until bytesPerLine * 8 step 8) {
+
+                var byte = 0
+
+                for (bit in 0 until 8) {
+                    val xPos = x + bit
+
+                    if (xPos < width) {
+                        val pixel = bitmap.getPixel(xPos, y)
+
+                        val r = (pixel shr 16) and 0xff
+                        val g = (pixel shr 8) and 0xff
+                        val b = pixel and 0xff
+
+                        val gray = (r + g + b) / 3
+
+                        if (gray < 128) {
+                            byte = byte or (1 shl (7 - bit))
+                        }
+                    }
+                }
+
+                bytes.add(byte.toByte())
+            }
+        }
+
+        return bytes.toByteArray()
+    }
+    fun printText(
+        context: Context,
+        device: UsbDevice,
+        text: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        init(context, device) { ready ->
+
+            if (!ready) {
+                onResult(false)
+                return@init
+            }
+
+            val ep = outEndpoint
+            val conn = connection
+
+            if (ep == null || conn == null) {
+                onResult(false)
+                return@init
+            }
+
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
                     val init = byteArrayOf(0x1B, 0x40)
 
-                    // 🔔 BEEP
-                    val beep = byteArrayOf(0x1B, 0x42, 0x03, 0x02)
-
-                    // CENTER ALIGN
-                    val center = byteArrayOf(0x1B, 0x61, 0x01)
-
-                    // LEFT ALIGN
-                    val left = byteArrayOf(0x1B, 0x61, 0x00)
-
-                    // IMAGE
-                    val imageBytes = convertBitmapToEscPos(bitmap)
-
-                    // TEXT
                     val safeText = text
                         .replace("\n", "\r\n")
                         .toByteArray(Charsets.US_ASCII)
 
-                    // FEED + CUT
-                    val feedAndCut = byteArrayOf(
+                    val feedCut = byteArrayOf(
                         0x1B, 0x64, 0x03,
                         0x1D, 0x56, 0x01
                     )
 
-                    // 🔥 FINAL DATA
-                    val data = init +
-                            beep +
-                            center +
-                            imageBytes +
-                            left +
-                            safeText +
-                            feedAndCut
+                    // ✅ SEND STEP BY STEP
+                    conn.bulkTransfer(ep, init, init.size, 1000)
+                    delay(50)
 
-                    val sent = conn.bulkTransfer(ep, data, data.size, 5000)
+                    conn.bulkTransfer(ep, safeText, safeText.size, 5000)
+                    delay(100)
+
+                    conn.bulkTransfer(ep, feedCut, feedCut.size, 1000)
 
                     withContext(Dispatchers.Main) {
-                        onResult(sent > 0)
+                        onResult(true)
                     }
 
                 } catch (e: Exception) {
-                    Log.e(TAG, "USB print logo error", e)
+                    withContext(Dispatchers.Main) {
+                        onResult(false)
+                    }
+                }
+            }
+        }
+    }
+    fun printLogoAndText(
+        context: Context,
+        device: UsbDevice,
+        bitmap: Bitmap,
+        text: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        init(context, device) { ready ->
+
+            if (!ready) {
+                onResult(false)
+                return@init
+            }
+
+            val ep = outEndpoint
+            val conn = connection
+
+            if (ep == null || conn == null) {
+                onResult(false)
+                return@init
+            }
+
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    // =============================
+                    // INIT PRINTER
+                    // =============================
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x40), 2, 1000)
+                    delay(50)
+
+                    // =============================
+                    // CENTER ALIGN
+                    // =============================
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x61, 0x01), 3, 1000)
+                    delay(50)
+
+                    // =============================
+                    // PRINT LOGO (🔥 NEW METHOD)
+                    // =============================
+                    printBitmapInChunksUSB(conn, ep, bitmap)
+
+                    delay(100)
+
+                    // =============================
+                    // LEFT ALIGN
+                    // =============================
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x61, 0x00), 3, 1000)
+                    delay(50)
+
+                    // =============================
+                    // TEXT
+                    // =============================
+                    val safeText = text
+                        .replace("\n", "\r\n")
+                        .toByteArray(Charsets.US_ASCII)
+
+                    conn.bulkTransfer(ep, safeText, safeText.size, 5000)
+                    delay(100)
+
+                    // =============================
+                    // FEED + CUT
+                    // =============================
+                    val cut = byteArrayOf(
+                        0x0A, 0x0A,
+                        0x1D, 0x56, 0x01
+                    )
+
+                    conn.bulkTransfer(ep, cut, cut.size, 1000)
+
+                    withContext(Dispatchers.Main) {
+                        onResult(true)
+                    }
+
+                } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
                         onResult(false)
                     }
@@ -239,55 +405,203 @@ object USBPrinter {
     }
 
 
-    private fun convertBitmapToEscPos(bitmap: android.graphics.Bitmap): ByteArray {
+
+    fun printLogoTextQrUSB(
+        context: Context,
+        device: UsbDevice,
+        logoBitmap: Bitmap?,   // nullable
+        qrBitmap: Bitmap?,     // nullable
+        text: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        init(context, device) { ready ->
+
+            if (!ready) {
+                onResult(false)
+                return@init
+            }
+
+            val ep = outEndpoint
+            val conn = connection
+
+            if (ep == null || conn == null) {
+                onResult(false)
+                return@init
+            }
+
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    // =============================
+                    // INIT
+                    // =============================
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x40), 2, 1000)
+                    delay(50)
+
+                    // =============================
+                    // CENTER ALIGN
+                    // =============================
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x61, 0x01), 3, 1000)
+                    delay(50)
+
+                    // =============================
+                    // PRINT LOGO
+                    // =============================
+                    if (logoBitmap != null) {
+                        printBitmapInChunksUSB(conn, ep, logoBitmap)
+                        delay(100)
+                    }
+
+                    // =============================
+                    // PRINT QR (🔥 THIS WAS MISSING)
+                    // =============================
+                    if (qrBitmap != null) {
+
+                        // 🔥 VERY IMPORTANT (same as BT)
+                        delay(200)
+
+                        val resizedQr = Bitmap.createScaledBitmap(
+                            qrBitmap,
+                            256,
+                            256,
+                            true
+                        )
+
+                        printBitmapInChunksUSB(conn, ep, resizedQr)
+
+                        delay(200)
+                    }
+
+                    // =============================
+                    // LEFT ALIGN
+                    // =============================
+                    conn.bulkTransfer(ep, byteArrayOf(0x1B, 0x61, 0x00), 3, 1000)
+                    delay(50)
+
+                    // =============================
+                    // TEXT
+                    // =============================
+                    val safeText = text
+                        .replace("\n", "\r\n")
+                        .toByteArray(Charsets.US_ASCII)
+
+                    conn.bulkTransfer(ep, safeText, safeText.size, 5000)
+
+                    // small spacing
+                    conn.bulkTransfer(ep, byteArrayOf(0x0A, 0x0A), 2, 1000)
+
+                    delay(100)
+
+                    // =============================
+                    // CUT
+                    // =============================
+                    conn.bulkTransfer(
+                        ep,
+                        byteArrayOf(0x1D, 0x56, 0x01),
+                        3,
+                        1000
+                    )
+
+                    withContext(Dispatchers.Main) {
+                        onResult(true)
+                    }
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "USB logo + QR print failed", e)
+                    withContext(Dispatchers.Main) {
+                        onResult(false)
+                    }
+                }
+            }
+        }
+    }
+    private fun convertBitmapToEscPos(bitmap: Bitmap): ByteArray {
+
         val width = bitmap.width
         val height = bitmap.height
 
         val bytes = ArrayList<Byte>()
 
-        for (y in 0 until height step 24) {
+        val bytesPerRow = (width + 7) / 8
 
-            bytes.add(0x1B)
-            bytes.add(0x2A)
-            bytes.add(33)
+        // GS v 0
+        bytes.add(0x1D)
+        bytes.add(0x76)
+        bytes.add(0x30)
+        bytes.add(0x00)
 
-            bytes.add((width % 256).toByte())
-            bytes.add((width / 256).toByte())
+        bytes.add((bytesPerRow % 256).toByte())
+        bytes.add((bytesPerRow / 256).toByte())
 
-            for (x in 0 until width) {
-                for (k in 0 until 3) {
+        bytes.add((height % 256).toByte())
+        bytes.add((height / 256).toByte())
 
-                    var slice = 0
+        for (y in 0 until height) {
+            for (x in 0 until bytesPerRow * 8 step 8) {
 
-                    for (b in 0 until 8) {
-                        val yPos = y + (k * 8) + b
+                var slice = 0
 
-                        if (yPos < height) {
-                            val pixel = bitmap.getPixel(x, yPos)
+                for (b in 0 until 8) {
+                    val xPos = x + b
 
-                            val r = (pixel shr 16) and 0xff
-                            val g = (pixel shr 8) and 0xff
-                            val bVal = pixel and 0xff
+                    if (xPos < width) {
+                        val pixel = bitmap.getPixel(xPos, y)
 
-                            val gray = (r + g + bVal) / 3
+                        val r = (pixel shr 16) and 0xff
+                        val g = (pixel shr 8) and 0xff
+                        val bVal = pixel and 0xff
 
-                            if (gray < 128) {
-                                slice = slice or (1 shl (7 - b))
-                            }
+                        val gray = (r + g + bVal) / 3
+
+                        if (gray < 128) {
+                            slice = slice or (1 shl (7 - b))
                         }
                     }
-
-                    bytes.add(slice.toByte())
                 }
-            }
 
-            if (y + 24 < height) {
-                bytes.add(0x0A)
+                bytes.add(slice.toByte())
             }
         }
 
         return bytes.toByteArray()
     }
+
+    private fun printBitmapInChunksUSB(
+        conn: UsbDeviceConnection,
+        ep: UsbEndpoint,
+        bitmap: Bitmap
+    ) {
+        val chunkHeight = 48
+
+        var y = 0
+        while (y < bitmap.height) {
+
+            val height = minOf(chunkHeight, bitmap.height - y)
+
+            val chunk = Bitmap.createBitmap(bitmap, 0, y, bitmap.width, height)
+            val bytes = convertBitmapToRaster(chunk)
+
+            var offset = 0
+            val packetSize = 2048
+
+            while (offset < bytes.size) {
+                val end = minOf(offset + packetSize, bytes.size)
+                val part = bytes.copyOfRange(offset, end)
+
+                conn.bulkTransfer(ep, part, part.size, 3000)
+                offset = end
+
+                Thread.sleep(20) // 🔥 IMPORTANT
+            }
+
+            Thread.sleep(40) // 🔥 VERY IMPORTANT
+            y += height
+        }
+    }
+
+
+
+
+
     // =================================================
     // DEVICE LIST
     // =================================================

@@ -21,6 +21,7 @@ import com.it10x.foodappgstav7_11.printer.PrintJob
 import kotlinx.coroutines.runBlocking
 import com.it10x.foodappgstav7_11.data.printqueue.PrintQueueDao
 import com.it10x.foodappgstav7_11.printer.queue.PrintQueueManager
+import com.it10x.foodappgstav7_11.printer.utils.QrUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -368,127 +369,33 @@ class PrinterManager private constructor(
             onResult(false)
             return
         }
+        val outletInfo = getOutletInfoOrNull()
+//        val qrBitmap =
+//            if (
+//                role != PrinterRole.KITCHEN &&
+//                outletInfo?.qrEnabled == true &&
+//                !outletInfo.qrText.isNullOrBlank()
+//            ) {
+//                try {
+//                    QrUtils.generateQr(outletInfo.qrText!!)
+//                } catch (e: Exception) {
+//                    null
+//                }
+//            } else null
 
-        //Log.d("PRINT", "Printing role=$role type=${config.type}")
-        //  var  text1="kljkl"
+        val qrBitmap =
+            if (
+                role != PrinterRole.KITCHEN &&
+                outletInfo?.qrEnabled == true
+            ) {
+                QrUtils.loadSavedQr(context)
+            } else null
+
+
+
         when (config.type) {
 
-//            PrinterType.BLUETOOTH -> {
-//                if (config.bluetoothAddress.isBlank()) {
-//                    onResult(false)
-//                    return
-//                }
-//
-//                try {
-//                    val isKitchen = role == PrinterRole.KITCHEN
-//
-//                    val size = prefs.getPrinterSize(role) ?: "80mm"
-//
-//                    val logoFile = java.io.File(context.filesDir, "logo.png")
-//
-//                    val bitmap = if (logoFile.exists()) {
-//                        android.graphics.BitmapFactory.decodeFile(logoFile.absolutePath)
-//                    } else null
-//
-//                    val targetWidth = if (size == "80mm") 384 else 384
-//
-//                    val resizedLogo = bitmap?.let {
-//                        com.it10x.foodappgstav7_11.printer.bluetooth.BluetoothPrinter.resizeBitmap(it, targetWidth)
-//                    }
-//
-//                    // 🔥 MAIN LOGIC
-//                    if (!isKitchen && resizedLogo != null) {
-//                        // ✅ CUSTOMER PRINTER → WITH LOGO
-//                        BluetoothPrinter.printLogoAndText(
-//                            config.bluetoothAddress,
-//                            resizedLogo,
-//                            text,
-//                            onResult
-//                        )
-//                    } else {
-//                        // ✅ KITCHEN → TEXT ONLY
-//                        BluetoothPrinter.printText(
-//                            config.bluetoothAddress,
-//                            text,
-//                            onResult
-//                        )
-//                    }
-//
-//                } catch (e: Exception) {
-//                    BluetoothPrinter.printText(
-//                        config.bluetoothAddress,
-//                        text,
-//                        onResult
-//                    )
-//                }
-//            }
 
-
-//            PrinterType.BLUETOOTH -> {
-//                if (config.bluetoothAddress.isBlank()) {
-//                    onResult(false)
-//                    return
-//                }
-//
-//                try {
-//                    val isKitchen = role == PrinterRole.KITCHEN
-//                    val size = prefs.getPrinterSize(role) ?: "80mm"
-//
-//                    // =============================
-//                    // LOAD LOGO
-//                    // =============================
-//                    val logoFile = java.io.File(context.filesDir, "logo.png")
-//
-//                    val logoBitmap = if (logoFile.exists()) {
-//                        android.graphics.BitmapFactory.decodeFile(logoFile.absolutePath)
-//                    } else null
-//
-//                    val targetWidth = if (size == "80mm") 384 else 384
-//
-//                    val resizedLogo = logoBitmap?.let {
-//                        com.it10x.foodappgstav7_11.printer.bluetooth.BluetoothPrinter
-//                            .resizeBitmap(it, targetWidth)
-//                    }
-//
-//                    // =============================
-//                    // LOAD QR (NEW)
-//                    // =============================
-//                    val qrFile = java.io.File(context.filesDir, "qr.png")
-//
-//                    val qrBitmap = if (qrFile.exists()) {
-//                        android.graphics.BitmapFactory.decodeFile(qrFile.absolutePath)
-//                    } else null
-//
-//                    // =============================
-//                    // 🔥 MAIN LOGIC (UPDATED)
-//                    // =============================
-//                    if (!isKitchen) {
-//                        // ✅ CUSTOMER PRINTER (LOGO + TEXT + QR smart)
-//                        BluetoothPrinter.printLogoTextQr(
-//                            mac = config.bluetoothAddress,
-//                            logoBitmap = resizedLogo,   // can be null
-//                            qrBitmap = qrBitmap,        // can be null
-//                            text = text,
-//                            onResult = onResult
-//                        )
-//                    } else {
-//                        // ✅ KITCHEN → TEXT ONLY (keep clean)
-//                        BluetoothPrinter.printText(
-//                            config.bluetoothAddress,
-//                            text,
-//                            onResult
-//                        )
-//                    }
-//
-//                } catch (e: Exception) {
-//                    // 🔥 SAFE FALLBACK
-//                    BluetoothPrinter.printText(
-//                        config.bluetoothAddress,
-//                        text,
-//                        onResult
-//                    )
-//                }
-//            }
 
 //PRINT QR CODE FORM TEXT
 
@@ -520,14 +427,12 @@ class PrinterManager private constructor(
                     // =============================
                     // 🔥 GENERATE QR (NEW)
                     // =============================
-                    val qrBitmap = if (!isKitchen) {
-                        BluetoothPrinter.generateQr("https://grillhutjunction.com")
-                    } else null
+
 
                     // =============================
                     // 🔥 MAIN LOGIC
                     // =============================
-                    if (!isKitchen) {
+                    if (!isKitchen && (resizedLogo != null || qrBitmap != null)) {
                         BluetoothPrinter.printLogoTextQr(
                             mac = config.bluetoothAddress,
                             logoBitmap = resizedLogo,
@@ -575,17 +480,22 @@ class PrinterManager private constructor(
                         com.it10x.foodappgstav7_11.printer.bluetooth.BluetoothPrinter.resizeBitmap(it, targetWidth)
                     }
 
-                    if (!isKitchen && resizedLogo != null) {
-                        // ✅ WITH LOGO (customer printer)
-                        LanPrinter.printLogoAndText(
-                            config.ip,
-                            config.port,
-                            resizedLogo,
-                            text,
-                            onResult
+
+                    if (!isKitchen && (resizedLogo != null || qrBitmap != null)) {
+
+
+
+                        LanPrinter.printLogoTextQr(
+                            ip = config.ip,
+                            port = config.port,
+                            logoBitmap = resizedLogo,
+                            qrBitmap = qrBitmap,
+                            text = text,
+                            onResult = onResult
                         )
+
                     } else {
-                        // ✅ KITCHEN → TEXT ONLY
+
                         LanPrinter.printText(
                             config.ip,
                             config.port,
@@ -650,11 +560,15 @@ class PrinterManager private constructor(
                         BluetoothPrinter.resizeBitmap(it, targetWidth)
                     }
 
-                    if (!isKitchen && resizedLogo != null) {
-                        USBPrinter.printLogoAndText(
+
+                  if (!isKitchen && (resizedLogo != null || qrBitmap != null)) {
+
+
+                        USBPrinter.printLogoTextQrUSB(
                             context,
                             device,
-                            resizedLogo,
+                            resizedLogo,   // can be null
+                            qrBitmap,      // 🔥 NEW
                             text,
                             onResult
                         )

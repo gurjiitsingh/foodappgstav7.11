@@ -37,6 +37,11 @@ data class OutletEntity(
     val printerName: String?,
     val footerNote: String?,
 
+    // QR
+    val qrEnabled: Boolean = false,
+    val qrText: String? = null,
+    val qrTitle: String? = null,
+
     // ---------- STATUS ----------
     val isActive: Boolean,
 

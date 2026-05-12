@@ -35,7 +35,11 @@ fun USBPrinterScreen(role: PrinterRole) {
     val devices = viewModel.usbDevices
 
     // ✅ Selection state
-    var selectedDeviceId by remember { mutableStateOf<Int?>(null) }
+    var selectedDeviceId by remember {
+        mutableStateOf(
+            prefs.getUSBPrinterId(role).takeIf { it != -1 }
+        )
+    }
 
     // ✅ USB helper (same as old code)
     val usbPrinterHelper = remember { USBPrinterHelper(context) }
@@ -80,9 +84,11 @@ fun USBPrinterScreen(role: PrinterRole) {
 
                             // ✅ save USB correctly (VERY IMPORTANT)
                             prefs.saveUSBPrinter(
-                                role,
-                                device.vendorId,
-                                device.productId
+                                role = role,
+                                vendorId = device.vendorId,
+                                productId = device.productId,
+                                deviceId = device.deviceId,
+                                name = device.deviceName ?: "USB Printer"
                             )
 
                             // ✅ test print (same as before)

@@ -89,11 +89,15 @@ class PrinterPreferences(
     fun saveUSBPrinter(
         role: PrinterRole,
         vendorId: Int,
-        productId: Int
+        productId: Int,
+        deviceId: Int,
+        name: String
     ) {
         prefs.edit()
             .putInt("usb_printer_${role.name.lowercase()}_vendorId", vendorId)
             .putInt("usb_printer_${role.name.lowercase()}_productId", productId)
+            .putInt("usb_printer_${role.name.lowercase()}_id", deviceId)
+            .putString("usb_printer_${role.name.lowercase()}_name", name)
             .apply()
     }
     fun getUSBPrinter(role: PrinterRole): Pair<Int, Int>? {
